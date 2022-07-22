@@ -1,12 +1,15 @@
 import os
+import sys
 import time
 import importlib
 import argparse
 import xml.etree.ElementTree as ET
 import xml.dom.minidom
+from pytermgui import tim, ansi_interface  # for TUI (text user interface)
 
 import advsearch.othello.board as board
 import advsearch.timer as timer
+
 
 def player_name(player_dir:str) -> str:
     """
@@ -17,11 +20,14 @@ def player_name(player_dir:str) -> str:
     if player_dir.startswith('advsearch'):
         return player_dir[len('advsearch')+1:]  # +1 to account for the / or .
 
+
 class Server(object):
     """
     Othello server, implements a simple file-based playing protocol
 
     """
+
+    SCREEN_BOARD_POSITION = (0, 2)  # col, row of board position on screen
 
     def __init__(self, p1_dir, p2_dir, delay, history, output, pace=0):
         """
@@ -69,45 +75,67 @@ class Server(object):
     def __del__(self):
         self.history_file.close()
 
+    def print_header(self):
+        tim.print(
+            f'[@green]{player_name(self.player_dirs[0])} ({self.board.num_pieces(board.Board.BLACK):02d} [black]⬤[/fg]) '
+            f'x ([ffffff]⬤[/fg] {self.board.num_pieces(board.Board.WHITE):02d}) [@green]{player_name(self.player_dirs[1])} [/bg]'
+        )
+
+    def display_board(self, move=None, flipped=False) -> None:
+        """
+        Displays the board on screen
+        :param move: move position to highlight or None
+        :param flipped: whether to highlight latest flipped pieces
+        :return:
+        """
+        ansi_interface.move_cursor(self.SCREEN_BOARD_POSITION)
+        tim.print(self.board.decorated_str(move=move, highlight_flipped=flipped))
+        sys.stdout.flush()
+        time.sleep(1)  # waits 1s for board visualization
+
     def run(self):
         self.start = time.localtime()
         player = 0
-
+        latest_move = None
         illegal_count = [0, 0]  # counts the number of illegal move attempts
 
-        print(f'---- Current match: {self.player_dirs[0]} (B) x {self.player_dirs[1]} (W) ----')
-        print('Initial board:')
-        print(self.board.decorated_str(colors=False))
+        ansi_interface.clear()
+        sys.stdout.flush()
 
         while True:  # runs until endgame
-
+            start = time.time()
             # checks whether players have available moves
             no_moves_current = len(self.board.legal_moves(self.player_colors[player])) == 0
             no_moves_opponent = len(self.board.legal_moves(self.board.opponent(self.player_colors[player]))) == 0
 
             # calculates scores
-            p1_score = sum([1 for char in str(self.board) if char == self.board.BLACK])
-            p2_score = sum([1 for char in str(self.board) if char == self.board.WHITE])
+            p1_score = self.board.num_pieces(self.board.BLACK) #sum([1 for char in str(self.board) if char == self.board.BLACK])
+            p2_score = self.board.num_pieces(self.board.WHITE) #sum([1 for char in str(self.board) if char == self.board.WHITE])
 
-            print(f'---- Current match: {self.player_dirs[0]} (B) x {self.player_dirs[1]} (W) ----')
+            ansi_interface.cursor_home()
+            self.print_header()
+            self.display_board()
+
+            ansi_interface.clear('eos')
 
             # disqualify player if he attempts illegal moves 5 times in a row
             if illegal_count[player] >= 5:
-                print(f'Player {player+1} ({self.player_dirs[player]}) DISQUALIFIED! Too many illegal move attempts.')
-                print('End of game reached!')
-                print('Player 1 (B): %d' % p1_score)
-                print('Player 2 (W): %d' % p2_score)
+                print(f'Player {player+1} ({self.player_dirs[player]}) DISQUALIFIED! Too many illegal move attempts or timeouts.')
+                print('Game finished!')
+                # print('Player 1 (B): %d' % p1_score)
+                # print('Player 2 (W): %d' % p2_score)
 
                 self.result = 1 - player
                 self.finish = time.localtime()
+                self.display_board()
                 return self.result
 
             # checks whether both players don't have available moves (end of game)
             if no_moves_current and no_moves_opponent:
 
-                print('End of game reached! Scores:')
-                print(f'Player 1 (B - {self.player_dirs[0]}): {p1_score}')
-                print(f'Player 2 (W - {self.player_dirs[1]}): {p2_score}')
+                print('Game finished!')
+                #print(f'Player 1 (B - {player_name(self.player_dirs[0])}: {p1_score}')
+                #print(f'Player 2 (W - {player_name(self.player_dirs[1])}): {p2_score}')
 
                 if p1_score > p2_score:
                     print(f'Player 1 (B - {self.player_dirs[0]} wins!')
@@ -123,59 +151,64 @@ class Server(object):
             # if current player has no moves, toggle player and continue
             if no_moves_current:
                 print(f'Player {player+1} ({self.player_dirs[player]}) has no legal moves and will not play this turn.')
-                illegal_count[player] = 0
+                # illegal_count[player] = 0
                 player = 1 - player
                 time.sleep(self.pace)
                 continue
 
             # creates a copy of the board, so that player changes won't affect mine
-            board_copy = board.from_string(self.board.__str__())
+            board_copy = self.board.copy()
 
             # calls current player's make_move function with the specified timeout
-            start = time.time()
             function_call = timer.FunctionTimer(self.player_modules[player].make_move, (board_copy, self.player_colors[player]))
             
-            delay = 60 if player_name(self.player_dirs[player]) == "humanplayer" else self.delay
-            move = function_call.run(delay)
-                
-            elapsed = time.time() - start
+            delay = 60 if self.player_dirs[player] == "advsearch.humanplayer" else self.delay
+            latest_move = function_call.run(delay)
 
-            if move is None:  # detects timeout
-                print('Player %d has not made a move and lost its turn. Illegal moves count incremented' % (player + 1))
+            # checks for timeout
+            if latest_move is None:  # detects timeout
+                print('Player %d TIMED OUT and lost its turn. Illegal moves count incremented' % (player + 1))
                 illegal_count[player] += 1
-                player = 1 - player
-                continue
+                #player = 1 - player
+                #continue
+                latest_move = -2, -2  # -2 is my code for timeout
 
-            move_x, move_y = move
+            move_x, move_y = latest_move
 
             # checks for move validity
-            if not isinstance(move_x, int):
-                print(f'Warning! move_x is {type(move_x)} but should be integer!')
-                move_x = -1
-            if not isinstance(move_y, int):
-                print(f'Warning! move_y is {type(move_y)} but should be integer!')
-                move_y = -1
+            if not isinstance(move_x, int) or not isinstance(move_y, int):
+                print(f'ILLEGAL MOVE! x, y are {type(move_x)}, {type(move_y)} but should be integer!')
+                move_x = move_y = -1  # -1 is my code for type error
+                illegal_count[player] += 1
+
+            # prints the board with a highlight on the move before flipping the pieces
+            if self.board.is_legal((move_y, move_x), self.player_colors[player]):
+                self.display_board(move=(move_y, move_x))
 
             # saves move in history
             self.history_file.write('%d,%d,%s\n' % (move_x, move_y, self.player_colors[player]))
             self.history.append(((move_x, move_y), self.player_colors[player]))
 
             if self.board.process_move((move_x, move_y), self.player_colors[player]):
-                illegal_count[player] = 0
+                # illegal_count[player] = 0
                 print('Player %d move %d,%d accepted.' % (player + 1, move_x, move_y))
+                self.display_board(move=(move_y, move_x), flipped=True)
 
             else:
                 illegal_count[player] += 1
-                print('Player %d move %d,%d ILLEGAL!' % (player + 1,move_x, move_y))
+                print('Player %d move %d,%d ILLEGAL!' % (player + 1, move_x, move_y))
 
-            # waits the remaining time, if needed
+            elapsed = time.time() - start  # calculates time spend to process this move
             if self.pace - elapsed > 0:
                 time.sleep(self.pace - elapsed)
 
-            print('Current board:')
-            print(self.board.decorated_str(
-                colors=False, move=(move_y, move_x), highlight_flipped=True
-            ))
+            ansi_interface.clear("eos")  # clears the remainder of the screen
+            #cursor_y, cursor_x, = ansi_interface.report_cursor()
+            #if cursor_y == 1:
+            #    print('\n' * 3)
+            #tim.print(self.board.decorated_str(highlight=(move_y, move_x), colsep=False))
+
+            ansi_interface.cursor_home()  # resets cursor to print all over
 
             # toggle player for next move
             player = 1 - player

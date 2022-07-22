@@ -17,7 +17,7 @@ def from_string(string):
     b = Board()
     # resets piece_count and set it during board construction
     b.piece_count = {b.BLACK: 0, b.WHITE: 0, b.EMPTY: 0}
-    for lineno, line in enumerate(string.split('\n')):
+    for lineno, line in enumerate(string.strip().split('\n')):
         line.strip()  # cuts the \n
 
         for colno, col in enumerate(line):
@@ -75,6 +75,13 @@ class Board(object):
     # list with all directions
     DIRECTIONS = [UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT]
 
+    # for printing on text user interface
+    PIECEMAP = {
+        BLACK: '[black]⬤[/fg]',
+        WHITE: '[ffffff]⬤[/fg]',
+        EMPTY: '-'
+    }
+
     def __init__(self):
         """
         Initializes the 8x8 board with all tiles empty, except the center
@@ -121,6 +128,27 @@ class Board(object):
         no_moves_white = len(self.legal_moves(self.WHITE)) == 0
 
         return no_moves_black and no_moves_white
+
+    def num_pieces(self, color: str) -> int:
+        """
+        Returns the number of pieces of the given color
+        :param color:
+        :return:
+        """
+        return self.piece_count[color]
+
+    def winner(self):
+        """
+        Returns the color that has won the match, or None if it is a draw
+        This only makes sense if self is a terminal state (not checked here)
+        :return:
+        """
+        if self.piece_count[self.BLACK] > self.piece_count[self.WHITE]:
+            return self.BLACK
+        elif self.piece_count[self.BLACK] < self.piece_count[self.WHITE]:
+            return self.WHITE
+        else:
+            return None
 
     def find_bracket(self, move, color, direction):
         """
@@ -185,14 +213,25 @@ class Board(object):
             return False
         return tx, ty
 
+    def copy(self):
+        """
+        Returns a copy of this board object
+        :return:
+        """
+        return from_string(self.__str__())
+
     def process_move(self, position, color):
         """
         Executes the placement of a tile of a given color
-        in a given position
+        in a given position. Note that this is done in-place,
+        changing the current board object! If you want to do lookahead searches,
+        make sure to copy the 'original' board first
         :param position:
         :param color:
         :return: bool
         """
+
+        self.flipped = set()  # resets flipped tiles
 
         # as the board is represented row-column, swaps coords to col-row
         position = position[1], position[0]
@@ -221,21 +260,21 @@ class Board(object):
         Traverses the board in the given direction,
         transforming the color of appropriate tiles
         :param origin: where the traversal will begin
-        :param color:
-        :param direction:
+        :param color: new color of the pieces
+        :param direction: direction of traversal (see the constants on the beginning of the class)
         :return:
         """
         destination = self.find_bracket(origin, color, direction)  # move, player, board, direction)
         if not destination:
             return
-
+        self.flipped.add(destination)  # for highlighting purposes (see decorated_str)
         ox, oy = origin
         dx, dy = direction
 
         nx, ny = ox + dx, oy + dy  # n stands for 'next'
 
         opp = self.opponent(color)
-        self.flipped = set()
+
         while (nx, ny) != destination:
             # flips the tile and updates piece counts
             self.flipped.add((nx, ny))
@@ -333,42 +372,50 @@ class Board(object):
         """
         Prints the string representation of the board
         :return:
+        TODO recreate this function without colors, bells and whistles
         """
 
         print(self.decorated_str())
 
-    def decorated_str(self, pretty=False, highlight=None):
+    def decorated_str(self, colors=True, move=None, highlight_flipped=False):
         """
         Returns the string representation of the board
         decorated with coordinates for board positions
-        :param highlight: tuple with position (row, col) to highlight
+        :param highlight_flipped: whether to highlight flipped pieces
+        :param colsep: whether to put column separators
+        :param move: tuple with position (row, col) to highlight the move done
         :return: str
-        TODO look at https://pypi.org/project/colorama/ and/or https://docs.python.org/3/howto/curses.html
         """
-        if pretty:
-            string = 'x   0   1   2   3   4   5   6   7 \n'
-            for i, row in enumerate(self.tiles):
-                string += '  -' + '----' * 8 + '\n'
-                string += '%d | %s |\n' % (i, ' | '.join(row))
-            string += '  -' + '----' * 8 + '\n'
-        else:
+        if colors:  # returns a string to be printed with tim.print
             string = 'x 0 1 2 3 4 5 6 7\n'
             for i, row in enumerate(self.tiles):
-                if highlight is None:
+                string += f'{i}[@green]'  # line number
+                for j, piece in enumerate(row):
+                    if (i, j) == move:
+                        string += f' [@red]{self.PIECEMAP[piece]}[@green]'
+                    elif (i, j) in self.flipped and highlight_flipped:
+                        string += f' [@yellow]{self.PIECEMAP[piece]}[@green]'
+                    else:
+                        string += f'[@green] {self.PIECEMAP[piece]}'
+                string += ' [/bg]\n'
+            string.replace('.', '-')
+        else:  # returns a simple string to be printed normally
+            string = 'x 0 1 2 3 4 5 6 7\n'
+            for i, row in enumerate(self.tiles):
+                if move is None or highlight_flipped == False:
                     string += f'{i} {" ".join(row)} \n'
                 else:
                     string += f'{i}'
                     for j, piece in enumerate(row):
-                        if (i, j) == highlight or (i, j) in self.flipped:
+                        if (i, j) == move or (i, j) in self.flipped:
                             string += f'*{piece}'
                             if j == 7:
                                 string += '*'  # adds sign to the right of boundary piece
-                        elif (i, j-1) == highlight or (i, j-1) in self.flipped:  # shows sign at the piece to the right of the highlighted one
+                        elif (i, j-1) == move or (i, j-1) in self.flipped:  # shows sign at the piece to the right of the highlighted one
                             string += f'*{piece}'
                         else:
                             string += f' {piece}'
-                    string += '\n'
-
+                    string += '\n'          
         return string
 
     def __str__(self):

@@ -11,10 +11,13 @@ kit_othello
 |   |   \-- board.py
 |   |-- randomplayer
 |   |   \-- agent.py       <-- agente que joga aleatoriamente
+|   |-- humanplayer        
+|   |   \-- agent.py       <-- agente para um humano jogar 
 |   |-- timer.py           <-- funcoes auxiliares de temporizacao
 |   \-- your_agent         <-- renomeie este diretorio c/ o nome do seu agente (pode adicionar outros arquivos aqui se precisar)
 |       |-- agent.py       <-- preencha o make_move aqui 
 |-- server.py
+|-- server_tui.py
 \-- test_agent.py          <-- teste o funcionamento basico do seu agente (pode adicionar outros casos de teste)
 ```
 
@@ -30,7 +33,9 @@ Para iniciar uma partida de Othello, digite no terminal:
 
 `python server.py [-h] [-d delay] [-p pace]  [-o output-file] [-l log-history] advsearch.player1 advsearch.player2`
 
-Onde 'player(1 ou 2)' são os diretórios dentro de `advsearch` onde estão implementados os módulos dos jogadores (dentro do arquivo agent).
+Para ver o tabuleiro e as peças com cores, instale a biblioteca `pytermgui` (por exemplo, com `pip install pytermgui`) e execute o `server_tui.py` ao invés do `server.py`.
+
+Nos parâmetros, 'player(1 ou 2)' são os diretórios dentro de `advsearch` onde estão implementados os módulos dos jogadores (dentro do arquivo agent).
 
 Os argumentos entre colchetes são opcionais, seu significado é descrito a seguir:
 ```text
@@ -53,6 +58,10 @@ uma partida random vs. random para ver o servidor funcionando:
 `python server.py advsearch.randomplayer advsearch.randomplayer -d 1 -p 0.3`
 
 O delay pode ser de 1 segundo porque o jogador random é muito rápido (e muito incompetente). O passo é de 0.3 segundos para acompanhar o progresso da partida (pode acelerar ou reduzir conforme a necessidade).
+
+O jogador 'human' se localiza no diretório `advsearch.humanplayer`. Você pode utilizar este player para jogar você mesmo e testar suas habilidades contra outro agente (inclusive o que você está construindo nesse trabalho). 
+
+Para jogar com ele, utilize os mesmo passos do jogador 'random', trocando o player1 ou 2 por `advsearch.humanplayer`. Você terá o limite de 1 minuto para pensar na sua jogada. Digite as coorenadas da ação na ordem `<coluna> <linha>`.  
 
 ## Funcionamento 
 
@@ -105,4 +114,5 @@ IMPORTANTE: cuidado com o sistema de coordenadas vs a indexação de matrizes. S
 * O servidor checa a legalidade das jogadas antes de efetivá-las.
 * Jogadas ilegais resultam em desqualificação.
 * O jogador 'random' apenas sorteia uma jogada entre as válidas no estado recebido.
+* O jogador 'human' verifica a legalidade da jogada antes de enviá-la ao servidor.
 * Em caso de problemas com o servidor, reporte via moodle ou email.
