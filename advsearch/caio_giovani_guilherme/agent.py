@@ -17,8 +17,8 @@ BLACK = 'B'
 # do seu agente.
 
 class Node:
-    def __init__(self, board, p_color, parent=None,cost=1,color = WHITE, evaluation = 1,previous_move = (-1,-1), best_move = (-1,-1)):
-        self.board = Board()
+    def __init__(self, board, p_color, parent=None,cost=1,color = Board.WHITE, evaluation = 1,previous_move = (-1,-1), best_move = (-1,-1)):
+        self.board = board
         self.player_color = p_color  
         self.parent = parent
         self.cost = cost
@@ -41,7 +41,7 @@ class Node:
             board.process_move(move,self.color)
             child = Node(board,self.color,self,self.cost + 1,board.opponent(self.color), 0, move, (-1,-1))
             result.append(child)
-            child.node_print_board()
+            
         
         return result
 
@@ -63,67 +63,55 @@ def make_move(the_board, color):
     # Remova-o e coloque a sua implementacao da poda alpha-beta
    
     
-    return jogar(the_board,color)
+    node = Node(the_board,p_color=BLACK,color=color)
+    return jogar(node)
 
 
 
 
 
 
-def jogar(s,color):
+def jogar(s: Node):
     
     #to do, não sei como calcular o custo
-    v = max_value(s,color,MENOS_INFINITO,MAIS_INFINITO)
+    v = max_value(s,MENOS_INFINITO,MAIS_INFINITO)
     print(v)
     exit(7)
     return v
 
-def utilidade(s: Board,color):
-    board_state = str(s)
-    utility = 0
-    for c in board_state:
-        if c == color:
-            utility += 1
-    return utility
+def utilidade(s: Node):
+    #to do
+    return 1
 
-def max_value(s: Board,color,alfa,beta):
-    if s.is_terminal_state():
-        return utilidade(s,color)
+def max_value(s: Node,alfa,beta):
+    if s.board.is_terminal_state():
+        return utilidade(s)
     
     v = MENOS_INFINITO
     
-    for s1 in sucessores(s,color):
-        v = max(v,min_value(s1,color,alfa,beta))
+    for s1 in s.expande():
+        v = max(v,min_value(s1,alfa,beta))
         
         alfa = max(alfa,v)
         if (alfa>=beta) :
             break
     return v
 
-def min_value(s:Board,color,alfa,beta):
-    if s.is_terminal_state():
-        return utilidade(s,color)
+def min_value(s: Node,alfa,beta):
+    if s.board.is_terminal_state():
+        return utilidade(s)
     
     v = MAIS_INFINITO
     
-    succ_list = sucessores(s,color)
+    succ_list = s.expande()
     for s1 in succ_list:
-        v = min(v,max_value(s1,color,alfa,beta))
+        v = min(v,max_value(s1,alfa,beta))
         
         beta = min(beta,v)
         if (beta<=alfa) :
             break
     return v
 
-    
-def sucessores(s: Board, color): 
-    filhos = []
-    moves = s.legal_moves(color)
-    for move in moves:
-        board = copy.deepcopy(s)
-        board.process_move(move,color)
-        filhos.append(board)
-    return filhos
 
 
 
