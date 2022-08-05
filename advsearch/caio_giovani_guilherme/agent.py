@@ -3,6 +3,7 @@ from curses.ascii import NUL
 import random
 import sys
 from board import *
+import time
 #from advsearch.othello import Board
 #from othello.board import Board
 import copy
@@ -10,6 +11,7 @@ MENOS_INFINITO = -1000
 MAIS_INFINITO = 1000
 WHITE = 'W'
 BLACK = 'B'
+TEMPO_LIMITE = 5
 # Voce pode criar funcoes auxiliares neste arquivo
 # e tambem modulos auxiliares neste pacote.
 #
@@ -17,15 +19,27 @@ BLACK = 'B'
 # do seu agente.
 
 class Node:
-    def __init__(self, board, p_color, parent=None,cost=1,color = Board.WHITE, evaluation = 1,previous_move = (-1,-1), best_move = (-1,-1)):
+  
+    def __init__(self, board, move, color, cost = 0, children=[], t0 = 0):
         self.board = board
-        self.player_color = p_color  
-        self.parent = parent
+        self.move = move
+        self.color = color
         self.cost = cost
-        self.color = color 
-        self.eval = evaluation 
-        self.previous_move = previous_move  
-        self.best_move = best_move
+        self.children = children
+        self.t0 = t0
+
+
+    def children_value(self,v):
+        for chil in self.children:
+            #print("valor de v:" + str(v))
+            #print("valor de chil cost:" + str(chil.cost))
+
+            if chil.cost == v:
+                #print("entrou aqui")
+                return chil
+
+        return None
+
 
     def node_print_board(self):
         print("Board: ")
@@ -36,20 +50,41 @@ class Node:
         result = []
         
         moves = self.board.legal_moves(self.color)
+       
+    
         for move in moves:
-            board = copy.deepcopy(self.board)
-            board.process_move(move,self.color)
-            child = Node(board,self.color,self,self.cost + 1,board.opponent(self.color), 0, move, (-1,-1))
-            result.append(child)
             
+            board1 = copy.deepcopy(self.board)
+            board1.process_move(move, self.color)
+            child = Node(board1, move, self.board.opponent(self.color),cost=self.cost+1,t0 = time.time())
+            self.children.append(child)
+            result.append(child)
+       
         
         return result
 
 
+"""
+def avaliacao(s: Node):
+    board = s.board
+    color = s.color
 
-def avaliacao():
+    number_of_pieces=board.piece_count[color] 
+    number_of_moves=len(board.legal_moves(color)) 
+    corners=[board.tiles[0][0],board.tiles[0][7],board.tiles[7][0],board.tiles[7][7]] 
+    if board.EMPTY in corners: 
+        return number_of_pieces + 4 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color)) 
+    return 5 * number_of_pieces + 2 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color))
+"""
+def avaliacao(s : Node): #quantas peças daquela cor
+    board = str(s.board)
+    color = s.color
+    value = 0
+    for c in board:
+        if c == color:
+            value += 1
+    return value    
     
-    return
 
 def make_move(the_board, color):
     """
@@ -63,7 +98,9 @@ def make_move(the_board, color):
     # Remova-o e coloque a sua implementacao da poda alpha-beta
    
     
-    node = Node(the_board,p_color=BLACK,color=color)
+    node = Node(the_board,None,color,t0 = time.time())
+    # return random.choice([(2, 3), (4, 5), (5, 4), (3, 2)])
+    
     return jogar(node)
 
 
@@ -74,32 +111,44 @@ def make_move(the_board, color):
 def jogar(s: Node):
     
     #to do, não sei como calcular o custo
+    
     v = max_value(s,MENOS_INFINITO,MAIS_INFINITO)
-    print(v)
-    exit(7)
-    return v
+    children_with_that_value: Node = s.children_value(v)
+    if children_with_that_value == None:
+        return(-1,-1)
+    else:
+        return children_with_that_value.move
 
 def utilidade(s: Node):
-    #to do
-    return 1
+    u = avaliacao(s)
+
+    return u
 
 def max_value(s: Node,alfa,beta):
-    if s.board.is_terminal_state():
-        return utilidade(s)
+    tf = time.time()
+    if s.board.is_terminal_state() or (tf - s.t0) > TEMPO_LIMITE:
+        u = utilidade(s)
+        s.cost = u
+        return u
     
     v = MENOS_INFINITO
     
+
     for s1 in s.expande():
         v = max(v,min_value(s1,alfa,beta))
         
         alfa = max(alfa,v)
         if (alfa>=beta) :
             break
+    s.cost = v
     return v
 
 def min_value(s: Node,alfa,beta):
-    if s.board.is_terminal_state():
-        return utilidade(s)
+    tf = time.time()
+    if s.board.is_terminal_state() or (tf - s.t0) > TEMPO_LIMITE:
+        u = utilidade(s)
+        s.cost = u
+        return u
     
     v = MAIS_INFINITO
     
@@ -108,8 +157,9 @@ def min_value(s: Node,alfa,beta):
         v = min(v,max_value(s1,alfa,beta))
         
         beta = min(beta,v)
-        if (beta<=alfa) :
+        if (beta>=alfa) :
             break
+    s.cost = v
     return v
 
 
