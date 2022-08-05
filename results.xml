@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<othello-match>
+	<timing start="Thu Aug  4 21:15:09 2022" finish="Thu Aug  4 21:15:10 2022"/>
+	<player1 directory="advsearch.caio_giovani_guilherme" color="B" result="loss" score="0"/>
+	<player2 directory="advsearch.randomplayer" color="W" result="win" score="6"/>
+	<moves>
+		<move coord="4,2" color="W"/>
+		<move coord="3,5" color="W"/>
+	</moves>
+</othello-match>
