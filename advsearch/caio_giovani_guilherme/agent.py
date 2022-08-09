@@ -6,6 +6,7 @@ from board import *
 import time
 #from advsearch.othello import Board
 #from othello.board import Board
+from ..othello import board
 import copy
 MENOS_INFINITO = -1000
 MAIS_INFINITO = 1000
@@ -63,9 +64,31 @@ class Node:
         
         return result
 
+def get_points(board: board.Board, agent_color: str) -> tuple[int, int]:
+    """
+    Returns a tuple (a,b) where a is the agent's points, and b is the opponent's points
+    """
+    oponent_color = board.opponent(agent_color)
+    p1_score = sum([1 for char in str(board) if char == agent_color])
+    p2_score = sum([1 for char in str(board) if char == oponent_color])
 
-"""
-def avaliacao(s: Node):
+    return (p1_score, p2_score)
+
+   
+def get_coin_difference(board: board.Board, agent_color: str):
+    """
+    Coin Difference:
+        A heurística Coin Difference simplesmente avalia a atual posição do tabuleiro e calcula a diferença de pontos entre os 	jogadores.
+        100 * (PlayerPoints - OponentPoints) / (PlayerPoints + OponentPoints)
+    """
+    player_points, opponent_points = get_points(board, agent_color)
+
+    if player_points + opponent_points == 0:
+        return 0
+    return 100 * (player_points - opponent_points)/(player_points + opponent_points)
+
+
+'''def avaliacao(s: Node):
     board = s.board
     color = s.color
 
@@ -74,8 +97,8 @@ def avaliacao(s: Node):
     corners=[board.tiles[0][0],board.tiles[0][7],board.tiles[7][0],board.tiles[7][7]] 
     if board.EMPTY in corners: 
         return number_of_pieces + 4 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color)) 
-    return 5 * number_of_pieces + 2 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color))
-"""
+    return 5 * number_of_pieces + 2 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color))'''
+
 def avaliacao(s : Node): #quantas peças daquela cor
     board = str(s.board)
     color = s.color
@@ -120,8 +143,8 @@ def jogar(s: Node):
         return children_with_that_value.move
 
 def utilidade(s: Node):
-    u = avaliacao(s)
-
+    #u = avaliacao(s)
+    u = get_coin_difference(s.board,s.color)
     return u
 
 def max_value(s: Node,alfa,beta):
