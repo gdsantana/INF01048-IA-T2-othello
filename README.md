@@ -1,6 +1,6 @@
 # Othello | Trabalho 2 da disciplina de Inteligência Artificial INF01048
 
-Caio Corardi | | Turma B
+Caio Corardi | 00279825 | Turma B
 
 Giovani da Silva | 00305086 | Turma A
 
