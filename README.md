@@ -15,12 +15,18 @@
 ## Heuristicas:
   ### Cantos Capturados:
    A ideia é que no othello os cantos são posições valiosas, já que um vez capturados eles não pode ser recapturados pelo jogador adversário.
+  
   ### Mobilidade Básica:
+    A mobilidade é fundamental no jogo, tanto para maximizar as possibilidades do jogador, quanto para reduzir as possibilidades do oponente. A mobilidade básica é calculada com base na quantidade de movimentos disponíveis para o jogador e para o oponente
   
   ### Mobilidade Potencial:
-  
+    A mobilidade potencial atua de forma a prever a mobilidade em jogadas futuras, ou seja, a longo prazo. A mobilidade potencial é calculada verificando a quantidade de espaços vazios ao redor das peças do oponente
+
   ### Diferença de Pontos:
    Avalia o atual estado do tabuleiro e calcula a diferença de pontos entre os jogadores
+  
+  #### Proximidade dos cantos:
+   Assim como é importante capturar um canto, é importante evitar que seu oponente capture. Peças contornando os cantos permitem que o oponente coloque uma peça no canto. Por isso, o ideal é evitar estas posições
   
   
   
