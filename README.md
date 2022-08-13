@@ -22,3 +22,10 @@
   ### Diferença de Pontos:
    Avalia o atual estado do tabuleiro e calcula a diferença de pontos entre os jogadores
   
+  
+  
+  
+  ### Algumas das dificuldades encontradas: 
+  - Problemas em se acertar com a biblioteca de time;
+  - Problema na retira do nó com melhor escolha;
+  - Problema com jogadas inválidas quando a melhor não estava disponível
