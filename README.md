@@ -14,7 +14,7 @@
 
 ## Heuristicas:
   ### Cantos Capturados:
-  
+      A ideia é que no othello os cantos são posições valiosas, já que um vez capturados eles não pode ser recapturados pelo jogador adversário.
   ### Mobilidade Básica:
   
   ### Mobilidade Potencial:
