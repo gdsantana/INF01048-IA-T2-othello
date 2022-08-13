@@ -1,3 +1,8 @@
+
+
+
+global COLOR_AG, COLOR_OP, BOARD
+
 from asyncio.windows_events import CONNECT_PIPE_INIT_DELAY, NULL
 from cmath import inf
 from curses.ascii import NUL
@@ -14,15 +19,14 @@ from ..othello import board
 import copy
 MENOS_INFINITO = -1000
 MAIS_INFINITO = 1000
-WHITE = 'W'
-BLACK = 'B'
-TEMPO_LIMITE = 5
+
+TEMPO_LIMITE = 4.9
 # Voce pode criar funcoes auxiliares neste arquivo
 # e tambem modulos auxiliares neste pacote.
 #
 # Nao esqueca de renomear 'your_agent' com o nome
 # do seu agente.
-
+succ_list = []
 position_weights = numpy.matrix([
     [20, -3, 11, 8, 8, 11, -3, 20],
     [-3, -7, -4, 1, 1, -4, -7, -3],
@@ -34,62 +38,19 @@ position_weights = numpy.matrix([
     [20, -3, 11, 8, 8, 11, -3, 20]
 ])
 
-class Node:
-  
-    def __init__(self, board, move, color, cost = 0, children=[], t0 = 0):
-        self.board = board
-        self.move = move
-        self.color = color
-        self.cost = cost
-        self.children = children
-        self.t0 = t0
 
-
-    def children_value(self,v):
-        for chil in self.children:
-            #print("valor de v:" + str(v))
-            #print("valor de chil cost:" + str(chil.cost))
-
-            if chil.cost == v:
-                #print("entrou aqui")
-                return chil
-
-        return None
-
-
-    def node_print_board(self):
-        print("Board: ")
-        print(Board.print_board(self.board))
-
-    
-    def expande(self):
-        result = []
-        
-        moves = self.board.legal_moves(self.color)
-       
-    
-        for move in moves:
-            
-            board1 = copy.deepcopy(self.board)
-            board1.process_move(move, self.color)
-            child = Node(board1, move, self.board.opponent(self.color),cost=self.cost+1,t0 = time.time())
-            self.children.append(child)
-            result.append(child)
-       
-        
-        return result
-
-def get_points(board: board.Board) -> tuple[int, int]:
+def get_points(board: Board) -> tuple[int, int]:
     """
     Returns a tuple (a,b) where a is the agent's points, and b is the opponent's points
     """
+  
     p1_score = sum([1 for char in str(board) if char == COLOR_AG])
     p2_score = sum([1 for char in str(board) if char == COLOR_OP])
 
     return (p1_score, p2_score)
 
    
-def coin_difference(board: board.Board):
+def coin_difference(board: Board):
     """
     Coin Difference:
         A heurística Coin Difference simplesmente avalia a atual posição do tabuleiro e calcula a diferença de pontos entre os 	jogadores.
@@ -101,7 +62,8 @@ def coin_difference(board: board.Board):
         return 0
     return 100 * (player_points - opponent_points)/(player_points + opponent_points)
 
-def potential_mobility(board: board.Board):
+def potential_mobility(board: Board):
+   
     directions = [(1,-1),(1,0),(1,1),(0,-1),(0,0),(0,1),(-1,-1),(-1,0),(-1,1)]
     ag_surrounding = 0
     op_surrounding = 0
@@ -122,17 +84,17 @@ def potential_mobility(board: board.Board):
         return 0
 
 
-def base_mobility(board: board.Board) -> int:
-    #print(len(board.legal_moves(COLOR_AG)))
-    #print(len(board.legal_moves(COLOR_OP)))
+def base_mobility(board: Board) -> int:
+    
     if (len(board.legal_moves(COLOR_AG)) + len(board.legal_moves(COLOR_OP))) > 0:
         return (100*(len(board.legal_moves(COLOR_AG))-len(board.legal_moves(COLOR_OP)))/(len(board.legal_moves(COLOR_AG)) + len(board.legal_moves(COLOR_OP))))
     else:
         return 0
 
-def close_to_corners(board: board.Board):
+def close_to_corners(board: Board):
     close_ag = 0
     close_op = 0
+   
 
     corners = [(0,0),(0,7),(7,0),(7,7)]
     close_to_corners = [(0,1),(1,0),(0,6),(1,7),(1,6),(6,0),(7,1),(6,1),(6,7),(7,6),(6,6)]
@@ -147,7 +109,8 @@ def close_to_corners(board: board.Board):
 
     return close_op-close_ag
 
-def corners_captured(board: board.Board):
+def corners_captured(board: Board):
+    
     corners = [(0,0),(0,7),(7,0),(7,7)]
     corners_ag = 0
     corners_op = 0
@@ -166,7 +129,8 @@ def corners_captured(board: board.Board):
 def move_sort(move):
     return -position_weights[move[1], move[0]]
 
-def move_priority(agent: board.Board) -> list[tuple[int, int]]:
+def move_priority(agent: Board) -> list[tuple[int, int]]:
+    
     moves = agent.legal_moves(COLOR_AG)
     
     moves.sort(key=move_sort)
@@ -174,134 +138,125 @@ def move_priority(agent: board.Board) -> list[tuple[int, int]]:
     return moves
 
 
-'''def avaliacao(s: Node):
-    board = s.board
-    color = s.color
 
-    number_of_pieces=board.piece_count[color] 
-    number_of_moves=len(board.legal_moves(color)) 
-    corners=[board.tiles[0][0],board.tiles[0][7],board.tiles[7][0],board.tiles[7][7]] 
-    if board.EMPTY in corners: 
-        return number_of_pieces + 4 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color)) 
-    return 5 * number_of_pieces + 2 * number_of_moves + 20 * corners.count(color)-20*corners.count(board.opponent(color))'''
-
-def heuristics(s: Node) -> int:
+def heuristics(s: Board) -> int:
+    BOARD = s
     points = get_points(BOARD)
     total = points[0] + points[1]
 
 
-    if total <=10:
-        return 10000
-    elif total <= 25:
-        #print(BOARD)
-        #print("Begin")
-        #print(corners_captured(BOARD))
-        #print(base_mobility(BOARD))
-        #print(potential_mobility(BOARD))
-        #print(close_to_corners(BOARD))
-        return 5*corners_captured(BOARD) + 25*base_mobility(BOARD) + 25*potential_mobility(BOARD) #+ 15*close_to_corners(BOARD)
+    if total <= 25:
+        return 5*corners_captured(BOARD) + 25*base_mobility(BOARD) + 25*potential_mobility(BOARD) + 15*close_to_corners(BOARD)
     elif total <= 50:
-        return 30*corners_captured(BOARD) + 20*base_mobility(BOARD) + 20*potential_mobility(BOARD) + 25*coin_difference(BOARD) #+ 15*close_to_corners(BOARD)
+        return 30*corners_captured(BOARD) + 20*base_mobility(BOARD) + 20*potential_mobility(BOARD) + 25*coin_difference(BOARD) + 15*close_to_corners(BOARD)
     else:
-        return 30*corners_captured(BOARD) + 15*base_mobility(BOARD) + 15*potential_mobility(BOARD) + 25*coin_difference(BOARD) #+ 10*close_to_corners(BOARD)
+        return 30*corners_captured(BOARD) + 15*base_mobility(BOARD) + 15*potential_mobility(BOARD) + 25*coin_difference(BOARD) + 10*close_to_corners(BOARD)
 
-def avaliacao(s : Node): #quantas peças daquela cor
-    board = str(s.board)
-    color = s.color
-    value = 0
-    for c in board:
-        if c == color:
-            value += 1
-    return value    
+
+
+
+
+def successors(state: Board, color):
+    succlist = []
+    legal_moves = state.legal_moves(color)
+    for move in legal_moves:
+        strs = from_string(str(state))
+        strs.process_move(move, color)
+        succlist.append(strs)
+    return succlist
+
+
+def max_value(s: Board,alfa,beta,t0,color):
+    v = -inf
+    sucessores = successors(s,color)
+    tf = time.time()
+    if sucessores==NULL or s.is_terminal_state() or (tf - t0) < TEMPO_LIMITE:
+        u = heuristics(s)
+        v = u
+        return v
     
 
-def make_move(the_board, color):
-    """
-    Returns an Othello move
-    :param the_board: a board.Board object with the current game state
-    :param color: a character indicating the color to make the move ('B' or 'W')
-    :return: (int, int) tuple with x, y indexes of the move (remember: 0 is the first row/column)
-    """
-    # o codigo abaixo apenas retorna um movimento aleatorio valido para
-    # a primeira jogada com as pretas.
-    # Remova-o e coloque a sua implementacao da poda alpha-beta
-    global COLOR_AG, COLOR_OP, BOARD
+    ###if  (tf - t0) < TEMPO_LIMITE:
+    ###    print("tf - t0" + str(tf-t0))
+    ##    return heuristics(s)
+    for son in sucessores:
+        v = max(v, min_value(son, alfa, beta, t0, color))
+        alfa = max(alfa, v)
+        if alfa >= beta: break
+        
+    return v
+    
+    
+
+
+def min_value(s: str,alfa,beta,t0,color):
+    v=inf
+    sucessores = successors(s,color)
+    tf = time.time()
+    if sucessores==NULL or s.is_terminal_state() or (tf - t0) < TEMPO_LIMITE: 
+        u = heuristics(s)
+        v = u
+        return v
+    
+    
+    for son in sucessores:
+        v = min(v, max_value(son, alfa, beta, t0, color))
+        beta = min(beta, v)
+        if beta <= alfa: break
+        
+    return v
+
+
+
+
+
+
+def jogar(state : Board, t0, color): 
+    melhor_suc = 0
+    
+    succ_list = successors(state, color)
+    if not succ_list:
+        return (-1,-1)
+    
+
+    legal_moves =state.legal_moves(color)
+    moves = list(zip(succ_list,legal_moves))
+    i = 0 
+    melhor_suc = max(succ_list, key= lambda s: min_value(s, -inf, inf, t0, color))
+    index = 0
+    for move in moves:
+        
+        #print("move[0] = " + str(move[0]))
+        #print("melhor_suc = " + str(melhor_suc))
+        if move[0] == melhor_suc:
+            print("entro aq" + str(move[1]))
+            index = i
+        i = i+1
+    #print("moves[index]:" + str(moves[index]))
+    return moves[index][1]
+    
+def make_move(the_board : Board, color):
+	
+    global COLOR_AG, COLOR_OP
     COLOR_AG = color
     if COLOR_AG == 'B':
         COLOR_OP = 'W'
     else:
         COLOR_OP = 'B'
-    BOARD = the_board
-
-    moves_available = move_priority(the_board)
-    if len(moves_available) == 0:
-        return (-1,-1)
+    color = COLOR_AG
+    #the_board.process_move(move, color)
+    move = jogar(the_board, time.time(), color)
+    
+    
+    if the_board.is_legal(move,color):
+        the_board.process_move(move, color)
+        return move
     else:
-        node = Node(the_board,None,color,t0 = time.time())
-        ok = jogar(node)
-        if ok in moves_available:
-            return ok
-        else:
-            return moves_available[0]
+        legal_moves = the_board.legal_moves(color)
+        return legal_moves[0] if len(legal_moves) > 0 else (-1, -1)
 
 
 
-def jogar(s: Node):
-    
-    #to do, não sei como calcular o custo
-    
-    v = max_value(s,MENOS_INFINITO,MAIS_INFINITO)
-    children_with_that_value: Node = s.children_value(v)
-    if children_with_that_value == None:
-        return(-1,-1)
-    else:
-        return children_with_that_value.move
-
-def utilidade(s: Node):
-    u = heuristics(s)
-    #u = avaliacao(s)
-    #u = get_coin_difference(s.board,s.color)
-    return u
-
-def max_value(s: Node,alfa,beta):
-    tf = time.time()
-    if s.board.is_terminal_state() or (tf - s.t0) > TEMPO_LIMITE:
-        u = heuristics(s)
-        #print(u)
-        s.cost = u
-        return u
-    
-    v = MENOS_INFINITO
-    
-
-    for s1 in s.expande():
-        v = max(v,min_value(s1,alfa,beta))
-        
-        alfa = max(alfa,v)
-        if (alfa>=beta) :
-            break
-    s.cost = v
-    return v
-
-def min_value(s: Node,alfa,beta):
-    tf = time.time()
-    if s.board.is_terminal_state() or (tf - s.t0) > TEMPO_LIMITE:
-        u = heuristics(s)
-        #print(u)
-        s.cost = u
-        return u
-    
-    v = MAIS_INFINITO
-    
-    succ_list = s.expande()
-    for s1 in succ_list:
-        v = min(v,max_value(s1,alfa,beta))
-        
-        beta = min(beta,v)
-        if (beta>=alfa) :
-            break
-    s.cost = v
-    return v
 
 
 
