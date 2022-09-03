@@ -1,47 +1,245 @@
-import random
-import sys
+import numpy
+from cmath import inf
 from othello.board import Board
-import copy
-# Voce pode criar funcoes auxiliares neste arquivo
-# e tambem modulos auxiliares neste pacote.
-#
-# Nao esqueca de renomear 'your_agent' com o nome
-# do seu agente.
+import time
+TEMPO_LIMITE = 4.9
+global COLOR_AG, COLOR_OP, BOARD
 
-class Node:
-    def __init__(self, board, p_color, parent=None,cost=1,color = Board.WHITE, evaluation = 1,previous_move = (-1,-1), best_move = (-1,-1)):
-        self.board = board
-        self.player_color = p_color  
-        self.parent = parent
-        self.cost = cost
-        self.color = color 
-        self.eval = evaluation 
-        self.previous_move = previous_move  
-        self.best_move = best_move  
+succ_list = []
+position_weights = numpy.matrix([
+    [20, -3, 11, 8, 8, 11, -3, 20],
+    [-3, -7, -4, 1, 1, -4, -7, -3],
+    [11, -4, 2, 2, 2, 2, -4, 11],
+    [8, 1, 2, -3, -3, 2, 1, 8],
+    [8, 1, 2, -3, -3, 2, 1, 8],
+    [11, -4, 2, 2, 2, 2, -4, 11],
+    [-3, -7, -4, 1, 1, -4, -7, -3],
+    [20, -3, 11, 8, 8, 11, -3, 20]
+])
 
-def expande(self):
-        result = []
-        moves = self.board.legal_moves(self.color)
-        for move in moves:
-            board = copy.deepcopy(self.board)
-            board.process_move(move,self.color)
-            child = Node(board,self.color,self,self.cost + 1,board.opponent(self.color), 0, move, (-1,-1))
-            result.append(child)
-        return result
 
-def avaliacao():
+def get_points(board: Board) -> tuple[int, int]:
+    """
+    Returns a tuple (a,b) where a is the agent's points, and b is the opponent's points
+    """
+  
+    p1_score = sum([1 for char in str(board) if char == COLOR_AG])
+    p2_score = sum([1 for char in str(board) if char == COLOR_OP])
+
+    return (p1_score, p2_score)
+
+   
+def coin_difference(board: Board):
+    """
+    Coin Difference:
+        A heurística Coin Difference simplesmente avalia a atual posição do tabuleiro e calcula a diferença de pontos entre os 	jogadores.
+        100 * (PlayerPoints - OponentPoints) / (PlayerPoints + OponentPoints)
+    """
+    player_points, opponent_points = get_points(board)
+
+    if player_points + opponent_points == 0:
+        return 0
+    return 100 * (player_points - opponent_points)/(player_points + opponent_points)
+
+def potential_mobility(board: Board):
+   
+    directions = [(1,-1),(1,0),(1,1),(0,-1),(0,0),(0,1),(-1,-1),(-1,0),(-1,1)]
+    ag_surrounding = 0
+    op_surrounding = 0
+    for i in range(8):
+        for j in range(8):        
+            if (board.tiles[i][j] != '.'):
+                for a, b in directions:
+                    x = i + a
+                    y = j + b
+                    if x >= 0 and x < 8 and y >=0 and y < 8 and board.tiles[x][y] == '.':
+                        if board.tiles[i][j] == COLOR_AG:
+                            ag_surrounding += 1
+                        else:
+                            op_surrounding += 1
+    if ag_surrounding != 0 or op_surrounding != 0:
+        return 100*(ag_surrounding-op_surrounding)/(ag_surrounding+op_surrounding)
+    else:
+        return 0
+
+
+def base_mobility(board: Board) -> int:
     
-    return
+    if (len(board.legal_moves(COLOR_AG)) + len(board.legal_moves(COLOR_OP))) > 0:
+        return (100*(len(board.legal_moves(COLOR_AG))-len(board.legal_moves(COLOR_OP)))/(len(board.legal_moves(COLOR_AG)) + len(board.legal_moves(COLOR_OP))))
+    else:
+        return 0
 
-def make_move(the_board, color):
-    """
-    Returns an Othello move
-    :param the_board: a board.Board object with the current game state
-    :param color: a character indicating the color to make the move ('B' or 'W')
-    :return: (int, int) tuple with x, y indexes of the move (remember: 0 is the first row/column)
-    """
-    # o codigo abaixo apenas retorna um movimento aleatorio valido para
-    # a primeira jogada com as pretas.
-    # Remova-o e coloque a sua implementacao da poda alpha-beta
-    return random.choice([(2, 3), (4, 5), (5, 4), (3, 2)])
+def close_to_corners(board: Board):
+    close_ag = 0
+    close_op = 0
+   
+
+    corners = [(0,0),(0,7),(7,0),(7,7)]
+    close_to_corners = [(0,1),(1,0),(0,6),(1,7),(1,6),(6,0),(7,1),(6,1),(6,7),(7,6),(6,6)]
+
+    for i, j in corners:
+        if board.tiles[i][j] != '.':
+            for a, b in close_to_corners:
+                if board.tiles[a][b] == COLOR_AG:
+                    close_ag += 1
+                elif board.tiles[a][b] == COLOR_OP:
+                    close_op += 1
+
+    return close_op-close_ag
+
+def corners_captured(board: Board):
+    
+    corners = [(0,0),(0,7),(7,0),(7,7)]
+    corners_ag = 0
+    corners_op = 0
+
+    for a, b in corners:
+        if board.tiles[a][b] == COLOR_AG:
+            corners_ag += 1
+        elif board.tiles[a][b] == COLOR_OP:
+            corners_op += 1
+
+    if corners_op + corners_ag != 0:
+        return 100 * (corners_ag - corners_op) / (corners_ag + corners_op)
+    else:
+        return 0
+
+def move_sort(move):
+    return -position_weights[move[1], move[0]]
+
+def move_priority(agent: Board) -> list[tuple[int, int]]:
+    
+    moves = agent.legal_moves(COLOR_AG)
+    
+    moves.sort(key=move_sort)
+    print(moves)
+    return moves
+
+
+
+def heuristics(s: Board) -> int:
+    BOARD = s
+    points = get_points(BOARD)
+    total = points[0] + points[1]
+
+
+    if total <= 25:
+        return 5*corners_captured(BOARD) + 25*base_mobility(BOARD) + 25*potential_mobility(BOARD) + 15*close_to_corners(BOARD)
+    elif total <= 50:
+        return 30*corners_captured(BOARD) + 20*base_mobility(BOARD) + 20*potential_mobility(BOARD) + 25*coin_difference(BOARD) + 15*close_to_corners(BOARD)
+    else:
+        return 30*corners_captured(BOARD) + 15*base_mobility(BOARD) + 15*potential_mobility(BOARD) + 25*coin_difference(BOARD) + 10*close_to_corners(BOARD)
+
+
+
+
+
+def successors(s: Board, color):
+    succlist = []
+    legal_moves = s.legal_moves(color)
+    for move in legal_moves:
+        strs = from_string(str(s))
+        strs.process_move(move, color)
+        succlist.append(strs)
+    return succlist
+
+
+def max_value(s: Board,alfa,beta,t0,color):
+    v = -inf
+    sucessores = successors(s,color)
+    tf = time.time()
+    if s.is_terminal_state()  or  sucessores==None or (tf - t0) < TEMPO_LIMITE:
+        u = heuristics(s)
+        v = u
+        return v
+    
+
+    ###if  (tf - t0) < TEMPO_LIMITE:
+    ###    print("tf - t0" + str(tf-t0))
+    ##    return heuristics(s)
+    for son in sucessores:
+        v = max(v, min_value(son, alfa, beta, t0, color))
+        alfa = max(alfa, v)
+        if alfa >= beta: 
+            break
+        
+    return v
+    
+    
+
+
+def min_value(s: str,alfa,beta,t0,color):
+    v=inf
+    sucessores = successors(s,color)
+    tf = time.time()
+    if s.is_terminal_state()  or  sucessores==None or (tf - t0) < TEMPO_LIMITE:
+        u = heuristics(s)
+        v = u
+        return v
+    
+    
+    for son in sucessores:
+        v = min(v, max_value(son, alfa, beta, t0, color))
+        beta = min(beta, v)
+        if beta <= alfa: 
+            break
+        
+    return v
+
+
+
+
+
+
+def jogar(s : Board, t0, color): 
+    melhor_suc = 0
+    
+    succ_list:list = successors(s, color)
+    
+    
+
+    legal_moves =s.legal_moves(color)
+    moves = list(zip(succ_list,legal_moves))
+    i = 0 #variavel auxiliar para achar o indice do melhor
+    melhor_suc = max(succ_list, key= lambda statesuc: min_value(statesuc, -inf, inf, t0, color))
+    index = 0
+    for move in moves:
+        
+        #print("move[0] = " + str(move[0]))
+        #print("melhor_suc = " + str(melhor_suc))
+        if move[0] == melhor_suc:
+            #print("entro aq" + str(move[1]))
+            index = i
+        i = i+1
+    #print("moves[index]:" + str(moves[index]))
+    return moves[index][1]
+    
+def make_move(the_board : Board, color):
+	
+    global COLOR_AG, COLOR_OP
+    COLOR_AG = color
+    if COLOR_AG == 'B':
+        COLOR_OP = 'W'
+    else:
+        COLOR_OP = 'B'
+    color = COLOR_AG
+    #the_board.process_move(move, color)
+    move = jogar(the_board, time.time(), color)
+    
+    
+    if the_board.is_legal(move,color) is True:
+        print("entrou aqui e escolheu o melhor mov")
+        the_board.process_move(move, color)
+        return move
+    else:
+        print("entrou aqui e escolheu o primeiro mov")
+        legal_moves = the_board.legal_moves(color)
+        return legal_moves[0] if len(legal_moves) > 0 else (-1, -1)
+
+
+
+
+
+
 
